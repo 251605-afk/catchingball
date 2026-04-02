@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>미니 타겟 게임</title>
+
+<!-- 픽셀 폰트 -->
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<style>
+body {
+  background-color: #f8f4e3;
+  text-align: center;
+  font-family: 'Press Start 2P', cursive;
+}
+
+h1 {
+  margin-top: 30px;
+  font-size: 18px;
+}
+
+#menu {
+  margin: 20px;
+}
+
+input, select, button {
+  font-family: 'Press Start 2P';
+  padding: 5px;
+  margin: 5px;
+}
+
+#gameArea {
+  width: 500px;
+  height: 400px;
+  margin: 20px auto;
+  border: 4px solid black;
+  position: relative;
+  background-color: #fffdf5;
+  image-rendering: pixelated;
+}
+
+/* 픽셀 공 */
+#ball {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  background: green;
+  image-rendering: pixelated;
+  cursor: pointer;
+  box-shadow: inset -4px -4px 0px rgba(0,0,0,0.3);
+}
+
+/* 반짝 효과 */
+.sparkle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: yellow;
+  pointer-events: none;
+  animation: pop 0.3s ease-out forwards;
+}
+
+@keyframes pop {
+  0% {transform: scale(1); opacity: 1;}
+  100% {transform: scale(2); opacity: 0;}
+}
+
+#ranking {
+  margin-top: 20px;
+  font-size: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>미니 타겟 게임</h1>
+
+<div id="menu">
+  <input type="text" id="playerName" placeholder="아이디 입력">
+  <br>
+  <select id="difficulty">
+    <option value="easy">쉬움</option>
+    <option value="normal">보통</option>
+    <option value="hard">어려움</option>
+  </select>
+  <button onclick="startGame()">시작</button>
+</div>
+
+<p>시간: <span id="time">10</span></p>
+<p>점수: <span id="score">0</span></p>
+
+<div id="gameArea">
+  <div id="ball"></div>
+</div>
+
+<div id="ranking">
+  <h3>🏆 TOP 3</h3>
+  <div id="rankList"></div>
+</div>
+
+<audio id="clickSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b6b3d.mp3"></audio>
+
+<script>
+const ball = document.getElementById("ball");
+const scoreText = document.getElementById("score");
+const timeText = document.getElementById("time");
+const clickSound = document.getElementById("clickSound");
+const rankList = document.getElementById("rankList");
+
+let score = 0;
+let time = 10;
+let size = 50;
+let timer;
+let player = "";
+
+// 중앙 배치
+function centerBall() {
+  const gameArea = document.getElementById("gameArea");
+  const x = (gameArea.clientWidth - size) / 2;
+  const y = (gameArea.clientHeight - size) / 2;
+  ball.style.left = x + "px";
+  ball.style.top = y + "px";
+}
+
+// 랜덤 이동 (더 빠르게)
+function moveBall() {
+  const gameArea = document.getElementById("gameArea");
+  const maxX = gameArea.clientWidth - size;
+  const maxY = gameArea.clientHeight - size;
+
+  ball.style.left = Math.random() * maxX + "px";
+  ball.style.top = Math.random() * maxY + "px";
+}
+
+// 반짝 효과
+function sparkle(x, y) {
+  const s = document.createElement("div");
+  s.className = "sparkle";
+  s.style.left = x + "px";
+  s.style.top = y + "px";
+  document.getElementById("gameArea").appendChild(s);
+
+  setTimeout(() => s.remove(), 300);
+}
+
+// 랭킹 불러오기
+function loadRanking() {
+  const data = JSON.parse(localStorage.getItem("ranking")) || [];
+  rankList.innerHTML = data
+    .map((r, i) => `${i+1}. ${r.name} - ${r.score}`)
+    .join("<br>");
+}
+
+// 랭킹 저장
+function saveRanking(name, score) {
+  let data = JSON.parse(localStorage.getItem("ranking")) || [];
+
+  data.push({name, score});
+  data.sort((a,b) => b.score - a.score);
+  data = data.slice(0,3);
+
+  localStorage.setItem("ranking", JSON.stringify(data));
+  loadRanking();
+}
+
+// 게임 시작
+function startGame() {
+  player = document.getElementById("playerName").value;
+  if (!player) {
+    alert("아이디 입력!");
+    return;
+  }
+
+  score = 0;
+  time = 10;
+
+  const diff = document.getElementById("difficulty").value;
+  if (diff === "easy") size = 60;
+  if (diff === "normal") size = 50;
+  if (diff === "hard") size = 40;
+
+  ball.style.width = size + "px";
+  ball.style.height = size + "px";
+
+  scoreText.textContent = score;
+  timeText.textContent = time;
+
+  centerBall();
+
+  clearInterval(timer);
+  timer = setInterval(() => {
+    time--;
+    timeText.textContent = time;
+
+    if (time <= 0) {
+      clearInterval(timer);
+      saveRanking(player, score);
+      alert("끝! 점수: " + score);
+    }
+  }, 1000);
+}
+
+// 클릭 이벤트
+ball.addEventListener("click", (e) => {
+  score++;
+  scoreText.textContent = score;
+
+  clickSound.currentTime = 0;
+  clickSound.play();
+
+  sparkle(e.offsetX + ball.offsetLeft, e.offsetY + ball.offsetTop);
+
+  size *= 0.93;
+  if (size < 15) size = 15;
+
+  ball.style.width = size + "px";
+  ball.style.height = size + "px";
+
+  moveBall();
+});
+
+// 처음 로딩
+window.onload = () => {
+  centerBall();
+  loadRanking();
+};
+</script>
+
+</body>
+</html>
